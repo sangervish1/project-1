@@ -1,0 +1,826 @@
+#include <ostream>
+#include <iostream>
+#include <cstdlib>
+#include <fstream>
+#include <string>
+#include <cstdlib>
+#include <limits>
+#include <bits/stdc++.h>
+#include <list>
+#include <set>
+#include <map>
+#include <queue>
+
+#include <iterator>
+#include <algorithm>
+
+using namespace std;
+
+#define DECK_COUNT 108
+#define TEXTFILE "intro.txt"
+#define PRINT_ALL_PLAYERS 0
+#define TEMP_DECK 1
+#define TURN 2
+#define TEST -1
+
+enum CARD_CATEGORY { wild, red, green, blue, yellow};
+
+
+/**
+ * C++ class to represent the Rank of the player
+ */
+class Rank{
+	public:
+	string name;
+	int remaining_cards;
+	Rank(string name, int remaining_cards);
+};
+
+bool operator<(const Rank &first, const Rank &second)
+{
+    return first.remaining_cards < second.remaining_cards;
+}
+
+bool compareRanks(Rank r1, Rank r2);
+bool compareMaxRanks(Rank r1, Rank r2);
+
+/**
+ * C++ class to represent the Card in the Deck
+ */
+class UnoCard
+{
+	public:
+		// number value may be 0-9 ,skip, reverse, all color, +4, +2
+		int number;
+		// red, green,blue,yellow,none
+		CARD_CATEGORY category;
+
+		UnoCard();
+		UnoCard(int num, CARD_CATEGORY col);
+
+		bool operator==(UnoCard const & otherCard) const;
+		bool operator!=(UnoCard const & otherCard) const;
+
+};
+
+std::ostream & operator<<(std::ostream & outStrem, UnoCard const & cardObject);
+
+
+class Deck : public UnoCard {
+	public:
+		Deck();
+		Deck(const Deck & otherDeck);
+		~Deck();
+		void createDeck();
+		int addCard(UnoCard unoCard);
+		UnoCard drawCard();
+		void quickShuffle();
+		void prinDeck();
+		int getSize();
+
+		const Deck & operator= (const Deck & otherDeck);
+	private:
+		int size;
+		list<UnoCard> unoDeck;
+		void copyDeck(const Deck & otherDeck);
+		void clearDeck();
+};
+
+std::ostream & operator<<(std::ostream & outStream, Deck const & deck);
+
+
+class Player
+{
+	public:
+		Player();
+		Player(const Player & otherPlayer);
+		~Player();
+
+		int getSize() const;
+		void addCard(UnoCard unoCard);
+		UnoCard removeCard(int id);
+		UnoCard topCard(int id) const;
+		void printHand() const;
+
+		const Player & operator= (const Player & otherPlayer);
+	private:
+		class PlayerDeck
+		{
+		  public:
+			PlayerDeck()
+			{
+				nextCard = NULL;
+			}
+			UnoCard unoCard;
+			PlayerDeck * nextCard;
+		};
+
+
+		PlayerDeck * headCard;
+		int size;
+		void clearDeck();
+		void copyDeck(const Player & otherPlayer);
+
+
+};
+
+
+
+Rank::Rank(string n, int remaining) {
+	name = n;
+	remaining_cards = remaining;
+}
+
+UnoCard::UnoCard() : number(0), category(wild)
+{
+
+}
+
+UnoCard::UnoCard(int num, CARD_CATEGORY cat) : number(num), category(cat)
+{
+
+}
+
+bool UnoCard::operator==(UnoCard const & other) const{
+	return number == other.number || category == other.category
+			|| category == wild || other.category == wild;
+}
+
+
+bool UnoCard::operator!=(UnoCard const & otherCard) const{
+	return !(*this == otherCard) ;
+}
+
+
+std::ostream & operator<<(std::ostream & out, UnoCard const & otherCard)
+{
+	out << "ID: ";
+	switch (otherCard.number)
+	{
+	case 10: out<< "Draw-2" ; break;
+	case 11: out<< "Skip"; break;
+	case 12: out<< "Reverse"; break;
+	case 13: out<< "Wild" ; break;
+	case 14: out<< "Draw-4-Wild" ; break;
+	default: out << (int) otherCard.number; break;
+	}
+
+	out << ", Color:" ;
+	switch (otherCard.category)
+	{
+	case red : out << "red";  break;
+	case green : out << "green";  break;
+	case yellow : out << "yellow";  break;
+	case blue : out << "blue";  break;
+	case wild : out << "wild";  break;
+	default: out << "Invalid Category"; break;
+	}
+	return out;
+}
+
+
+
+Deck::Deck()
+{
+	size = 0;
+}
+
+void Deck::createDeck()
+{
+	int count = 0 ;
+
+	for (int cat = 1 ; cat <= 4  ; cat++)
+	{
+		UnoCard c(count, static_cast<CARD_CATEGORY>(cat));
+		unoDeck.push_back(c);
+		size++;
+	}
+
+	for (count = 1; count <= 12; count++)
+	{
+		for (int j = 0 ; j < 2 ; j++ )
+		{
+			for (int cat = 1 ; cat <= 4  ; cat++)
+			{
+				UnoCard c(count, static_cast<CARD_CATEGORY>(cat));
+				unoDeck.push_back(c);
+				size++;
+			}
+		}
+
+	}
+
+	for (count = 13 ; count <= 14 ; count++)
+	{
+		for (int j = 0 ; j < 4 ; j++)
+		{
+			UnoCard c(count, wild);
+			unoDeck.push_back(c);
+			size++;
+		}
+	}
+}
+
+Deck::Deck(const Deck & otherDeck)
+{
+	copyDeck(otherDeck);
+}
+
+
+const Deck & Deck::operator= (const Deck & otherDeck)
+{
+	if (this != &otherDeck)
+	{
+		clearDeck();
+		copyDeck(otherDeck);
+	}
+	return *this;
+}
+
+
+
+Deck::~Deck()
+{
+	clearDeck();
+}
+
+
+UnoCard Deck::drawCard()
+{
+	if (size <= 0)
+	{
+		return UnoCard();
+	}
+	UnoCard lastCard = unoDeck.back();
+	unoDeck.pop_back();
+	size--;
+	return lastCard;
+}
+
+
+int Deck::addCard(UnoCard newCard)
+{
+	if(size < DECK_COUNT)
+	{
+		unoDeck.push_back(newCard);
+		size++;
+		return 0;
+	}
+	else
+		return -1;
+}
+
+
+void Deck::quickShuffle()
+{
+	stack<UnoCard> cards;
+	for (auto v : unoDeck)
+	{
+		cards.push(v);
+	}
+
+	std::vector<UnoCard> temp;
+
+	while (!cards.empty( ) )
+	{
+		UnoCard c = cards.top();
+		temp.push_back(c);
+		cards.pop();
+	}
+
+	std::random_shuffle(temp.begin(), temp.end());
+	std::copy(temp.begin(), temp.end(), unoDeck.begin());
+}
+
+void Deck::prinDeck()
+{
+
+	queue<UnoCard, list<UnoCard>> cardQueue(unoDeck);
+	int i =0;
+	while (!cardQueue.empty()) {
+
+		cout << i << ": " << cardQueue.front() << " ";
+		cardQueue.pop();
+		i++;
+	}
+
+
+}
+
+void Deck::copyDeck(const Deck & other)
+{
+	size = other.size;
+	unoDeck.clear();
+	unoDeck.assign(other.unoDeck.begin(), other.unoDeck.end());
+}
+
+
+void Deck::clearDeck()
+{
+	unoDeck.clear();
+	size = 0;
+}
+
+
+int Deck::getSize()
+{
+	return size;
+}
+
+
+
+Player::Player()
+{
+	headCard = NULL;
+	size = 0;
+}
+
+
+Player::Player(const Player & other)
+{
+	copyDeck(other);
+}
+
+
+const Player & Player::operator= (const Player & otherPlayer)
+{
+	if ( this != &otherPlayer)
+	{
+		clearDeck();
+		copyDeck(otherPlayer);
+	}
+	return *this;
+}
+
+
+Player::~Player()
+{
+	clearDeck();
+}
+
+
+UnoCard Player::removeCard(int id)
+{
+	if (id < 0 || id >= size )
+	{
+		return UnoCard();
+	}
+
+	PlayerDeck * prevCard = headCard;
+	PlayerDeck * toBeRemoved = prevCard->nextCard;
+	UnoCard tempCard;
+	int currentPos = id;
+
+	if (id == 0 )
+	{
+		tempCard = headCard->unoCard;
+		headCard = headCard->nextCard;
+		delete prevCard;
+		size--;
+		return tempCard;
+	}
+	while (currentPos > 1 )
+	{
+		prevCard = prevCard->nextCard;
+		toBeRemoved = prevCard->nextCard;
+		currentPos--;
+
+	}
+	prevCard->nextCard = toBeRemoved->nextCard;
+	tempCard = toBeRemoved->unoCard;
+	delete toBeRemoved;
+	size--;
+	return tempCard;
+
+}
+
+void Player::addCard(UnoCard newCard)
+{
+	PlayerDeck * playerDeck;
+	playerDeck = new PlayerDeck();
+	playerDeck->unoCard = newCard;
+	playerDeck->nextCard = headCard;
+	headCard = playerDeck;
+	size++;
+
+}
+
+void Player::printHand() const
+{
+	int currentSize = size;
+
+	int i = 0;
+	PlayerDeck *tempCard = headCard;
+	while (currentSize > 0)
+	{
+		cout <<  i << ":  " << tempCard->unoCard << endl;
+		tempCard = tempCard->nextCard;
+		i++;
+		currentSize--;
+	}
+
+}
+
+UnoCard Player::topCard(int pos) const
+{
+	int temp_pos = pos;
+	PlayerDeck * temp_elem = headCard;
+	while (temp_pos > 0 )
+	{
+		temp_elem = temp_elem->nextCard;
+		temp_pos--;
+	}
+
+	return temp_elem->unoCard;
+
+}
+
+
+void Player::copyDeck(const Player & otherPlayer)
+{
+	size = otherPlayer.size;
+
+	if (size > 0 )
+	{
+		headCard = new PlayerDeck();
+		headCard->unoCard = otherPlayer.headCard->unoCard;
+	}
+	else
+	{
+		headCard = NULL;
+		return;
+	}
+
+	PlayerDeck * otherHead = otherPlayer.headCard->nextCard;
+	PlayerDeck * tempCard;
+	PlayerDeck * prevCard = headCard;
+	for (int i=1 ; i<size; i++)
+	{
+		tempCard = new PlayerDeck();
+		prevCard->nextCard = tempCard;
+		tempCard->unoCard = otherHead->unoCard;
+		prevCard = tempCard;
+		tempCard = NULL;
+		otherHead = otherHead->nextCard;
+	}
+
+}
+
+int Player::getSize() const
+{
+	return size;
+}
+
+
+void Player::clearDeck()
+{
+	PlayerDeck * tempDeck = headCard;
+	PlayerDeck * nextDeck;
+	while (size > 0)
+	{
+		nextDeck = tempDeck->nextCard;
+		delete tempDeck;
+		tempDeck = nextDeck;
+		size--;
+	}
+	headCard = NULL;
+}
+
+
+void promptTurn (int id)
+{
+	cout << "Press " << id << " to confirm?" ;
+	int enteredId;
+	while( enteredId != id)
+	{
+		cin >> enteredId;
+	}
+}
+
+CARD_CATEGORY getCategory (const string & value, map<string,CARD_CATEGORY> colorMap)
+{
+	if(colorMap.find(value)!=colorMap.end()){
+		return colorMap[value];
+	}
+	else
+		return wild;
+}
+
+int main()
+{
+	cout<<"---------------------------\n";
+	cout<<"Welcome To UNO Card Game\n";
+	cout<<"---------------------------\n";
+
+	int totalPlayers;
+	int prompt = 0;
+	map<string,CARD_CATEGORY> colorMap;
+
+	colorMap.insert(pair<string, CARD_CATEGORY>("red", red));
+	colorMap.insert(pair<string, CARD_CATEGORY>("green", green));
+	colorMap.insert(pair<string, CARD_CATEGORY>("blue", blue));
+	colorMap.insert(pair<string, CARD_CATEGORY>("yellow", yellow));
+	while (prompt == 0 )
+	{
+		cout << "Please enter number of players: ";
+		cin >> totalPlayers;
+		if (totalPlayers >= 2 && totalPlayers <= 5)
+		{
+			cout << totalPlayers << " players playing the game... " << endl;
+			prompt = 1;
+			break;
+		}
+		else
+		{
+			cout << "Number of players should be in the range of 2 to 5..." << endl;
+		}
+	}
+	Deck unoMainDeck;
+	unoMainDeck.createDeck();
+	unoMainDeck.quickShuffle();
+
+	Player * playersList;
+	playersList = new Player[totalPlayers];
+
+	for (int p =0 ; p < totalPlayers ; p ++)
+	{
+		for (int c= 0 ; c< 7 ; c++)
+		{
+			UnoCard pickedCard;
+			pickedCard = unoMainDeck.drawCard();
+			playersList[p].addCard(pickedCard);
+		}
+	}
+
+	Deck currentPlayingDeck;
+	UnoCard lastPlayedCard;
+	UnoCard tempUnoCard;
+	int promptFlag = 0 ;
+
+	while (promptFlag == 0 )
+	{
+		tempUnoCard = unoMainDeck.drawCard();
+		if (tempUnoCard.category != wild)
+		{
+			promptFlag = 1;
+			lastPlayedCard = tempUnoCard;
+		}
+		else
+		{
+			currentPlayingDeck.addCard(tempUnoCard);
+		}
+	}
+
+
+	srand(time(NULL));
+	int whoseTurn = rand() % totalPlayers;
+	cout << "Player " << whoseTurn << " is playing first" << endl;
+	promptTurn(whoseTurn);
+
+	int gameOver = 0 ;
+	int turnFlag = 1;
+	bool drawFlag = false;
+
+	while (gameOver == 0 )
+	{
+		system("clear");
+		Player * currentPlayer = &playersList[whoseTurn%totalPlayers];
+		cout << "Player " << whoseTurn%totalPlayers << endl;
+		if (drawFlag)
+		{
+			if (lastPlayedCard.number == 10)
+			{
+				cout << "You are into Forced Draw-2" << endl;
+				UnoCard drawTwoCard;
+				for (int i = 0 ; i < 2; i ++)
+				{
+					drawTwoCard = unoMainDeck.drawCard();
+					currentPlayer->addCard(drawTwoCard);
+				}
+			}
+
+			if (lastPlayedCard.number == 14)
+			{
+				cout << "You are into Forced Draw-4" << endl;
+				UnoCard drawFourCard;
+				for (int i = 0 ; i < 4; i ++)
+				{
+					drawFourCard = unoMainDeck.drawCard();
+					currentPlayer->addCard(drawFourCard);
+				}
+
+			}
+			drawFlag = false;
+		}
+
+		cout<<"---------------------------------------------------\n";
+		cout << "Cards remaining for all players: " << endl;
+		for (int i= 0 ; i < totalPlayers; i ++ )
+		{
+			cout << "Player " << i << ": " << playersList[i].getSize() << "   " ;
+		}
+		cout << endl;
+		cout<<"---------------------------------------------------\n";
+		cout << "Last Played [ " << lastPlayedCard <<"]"<< endl;
+		cout<<"---------------------------------------------------\n";
+		cout << "Player " << whoseTurn%totalPlayers << endl;
+
+		currentPlayer->printHand();
+
+		int promptPlayer = 0 ;
+		int cardIndex;
+		int size = currentPlayer->getSize();
+		while (promptPlayer == 0)
+		{
+			cout << "\nYou are about to play a card!" << endl;
+			cout << "In order to pick a card, please enter -1 " << endl;
+			cout << "Enter the index of the card: ";
+			cin >> cardIndex;
+			if (cardIndex == -1)
+			{
+				UnoCard currentDrawn;
+				currentDrawn = unoMainDeck.drawCard();
+				cout << "You have played : " << currentDrawn << endl;
+				if (currentDrawn == lastPlayedCard && currentDrawn.category != wild)
+				{
+
+					int playPrompt = 0 ;
+					while (playPrompt == 0 )
+					{
+
+						string playChoice;
+						cout << "Do you want to play last drawn card[y/n]? " ;
+						cin >> playChoice;
+						if (playChoice == "y")
+						{
+							lastPlayedCard = currentDrawn;
+							currentPlayingDeck.addCard(currentDrawn);
+							if (lastPlayedCard.number >= 10 && lastPlayedCard.number <= 14)
+							{
+								drawFlag = true;
+							}
+							playPrompt = 1;
+						}
+						if (playChoice == "n")
+						{
+							currentPlayer->addCard(currentDrawn);
+							playPrompt = 1;
+						}
+					}
+
+				}
+				else
+				{
+					currentPlayer->addCard(currentDrawn);
+				}
+				promptPlayer = 1;
+
+			}
+			if (cardIndex >= 0 && cardIndex < size)
+			{
+				UnoCard intermediateCard = currentPlayer->topCard(cardIndex);
+				if (intermediateCard == lastPlayedCard)
+				{
+					currentPlayer->removeCard(cardIndex);
+					currentPlayingDeck.addCard(intermediateCard);
+					lastPlayedCard = intermediateCard;
+					if(lastPlayedCard.category == wild)
+					{
+						int promptColor = 0;
+						CARD_CATEGORY selectedCategory;
+						string chosenColor;
+						while (promptColor == 0)
+						{
+							cout << "Please select a color (red,green,blue,yellow) :";
+							cin >> chosenColor;
+							selectedCategory = getCategory(chosenColor,colorMap);
+							if (selectedCategory != wild)
+							{
+								lastPlayedCard.category = selectedCategory;
+								promptColor = 1;
+							}
+							else
+							{
+								cout << "Invalid color Category" << endl;
+							}
+
+						}
+					}
+					if (lastPlayedCard.number >= 10 && lastPlayedCard.number <= 14)
+					{
+						drawFlag = true;
+					}
+					promptPlayer = 1;
+				}
+				else
+				{
+					cout << "Invalid match: Card cannot be played " << endl;
+				}
+			}
+			else
+			{
+				cout<<"Invalid index!" << endl;
+			}
+		}
+
+		if ( currentPlayer->getSize() == 0 )
+		{
+			gameOver =1;
+			cout<<"==============================\n";
+			cout << "Player " << whoseTurn%totalPlayers << " has won the game." << endl;
+			cout<<"==============================\n";
+			break;
+		}
+
+		if (lastPlayedCard.number == 11 && drawFlag == true )
+		{
+			if (turnFlag == 1)
+				whoseTurn = whoseTurn+2;
+			else
+				whoseTurn = whoseTurn-2;
+		}
+		else if (lastPlayedCard.number == 12 && drawFlag == true)
+		{
+			if (totalPlayers == 2)
+			{
+				whoseTurn = whoseTurn+2;
+			}
+			else
+			{
+				if (turnFlag ==1)
+				{
+					turnFlag = -1;
+					whoseTurn--;
+				}
+				else
+				{
+					turnFlag = 1;
+					whoseTurn++;
+				}
+
+			}
+		}
+		else
+		{
+			if (turnFlag == 1)
+				whoseTurn++;
+			else
+				whoseTurn--;
+		}
+
+
+		system("clear") ;
+		cout << "Cards remaining for each player: " << endl;
+		for (int i= 0 ; i < totalPlayers; i ++ )
+		{
+			cout << "Player " << i << ": " << playersList[i].getSize() << "   " ;
+		}
+		cout << endl;
+
+		cout << "Played Card: " << lastPlayedCard << endl;
+		promptTurn(whoseTurn%totalPlayers);
+	}
+
+	set<Rank> ranks;
+	for (int i= 0 ; i < totalPlayers; i ++ )
+	{
+		string name = "player ";
+		string result = name + std::to_string( i );
+
+		Rank r(result, playersList[i].getSize());
+		ranks.insert(r);
+	}
+
+
+	cout<<"\nRank of the players" <<endl;
+	set<Rank>::iterator itr;
+
+	int i = 1;
+	for (set<Rank>::iterator itr = ranks.begin();
+			itr != ranks.end(); itr++)
+	{
+
+		string name = itr->name;
+		cout<<" Rank " <<i <<"," <<name<<endl;
+		i++;
+	}
+
+
+	Rank minRank = *std::min_element(ranks.begin(), ranks.end(), compareRanks);
+	Rank maxRank = *std::max_element(ranks.begin(), ranks.end(), compareMaxRanks);
+
+	cout <<"Player with minimum cards " <<minRank.name<< ",  Remaining: "<<minRank.remaining_cards <<endl;
+	cout <<"Player with maximum cards " <<maxRank.name<< ",  Remaining: " <<maxRank.remaining_cards<<endl;
+
+	cout<<"Closing the Game!!!"<<endl;
+	cout<<"Thank You!!!"<<endl;
+	return 0;
+}
+
+bool compareRanks(Rank r1, Rank r2) {
+	return r1.remaining_cards < r2.remaining_cards;
+}
+
+bool compareMaxRanks(Rank r1, Rank r2) {
+	return r1.remaining_cards > r2.remaining_cards;
+}
